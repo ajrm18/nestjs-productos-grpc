@@ -6,7 +6,15 @@ const PROTO_PATH = path.join(__dirname, 'src', 'productos.proto');
 const packageDef = protoLoader.loadSync(PROTO_PATH, { keepCase: true, longs: String, enums: String, defaults: true });
 const proto = grpc.loadPackageDefinition(packageDef).productos;
 
-const client = new proto.ProductoService('localhost:5000', grpc.credentials.createInsecure());
+// Uso: node cliente.js                            -> local
+//      node cliente.js xxxx.proxy.rlwy.net:12345  -> Railway
+const destino = process.argv[2] || 'localhost:5000';
+const credenciales = destino.endsWith(':443')
+  ? grpc.credentials.createSsl()
+  : grpc.credentials.createInsecure();
+console.log(`Conectando a ${destino}...\n`);
+
+const client = new proto.ProductoService(destino, credenciales);
 
 console.log('== ObtenerProducto (unary) ==');
 client.obtenerProducto({ id: 1 }, (err, producto) => {

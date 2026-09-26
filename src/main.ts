@@ -9,10 +9,10 @@ async function bootstrap() {
     options: {
       package: 'productos',
       protoPath: join(__dirname, 'productos.proto'),
-      url: '0.0.0.0:5000',
+      url: `0.0.0.0:${process.env.PORT ?? 5000}`,
     },
   });
   await app.listen();
-  console.log('Microservicio gRPC escuchando en 0.0.0.0:5000');
+  console.log(`Microservicio gRPC escuchando en 0.0.0.0:${process.env.PORT ?? 5000}`);
 }
 bootstrap();
