@@ -158,3 +158,29 @@ para `NOT_FOUND`).
 | Nivel de uso                          | 2-3 (borrador / revisor)                                                                                  |
 | Qué se le pidió                       | Guía paso a paso de la práctica y redacción de esta bitácora                                              |
 | Qué se modificó/verificó manualmente  | Ejecuté cada paso, verifiqué el streaming uno por uno, el error `NOT_FOUND` y el filtro de precios.       |
+
+## 8. Despliegue en Azure
+
+- **Endpoint público:** `productos-grpc-ajrm18.northcentralus.cloudapp.azure.com:5000`
+  (sin TLS). Prueba: `node cliente.js productos-grpc-ajrm18.northcentralus.cloudapp.azure.com:5000`
+- **Infraestructura:** VM Ubuntu 24.04 `vm-integracion` (Standard_B2ats_v2, grupo
+  `rg-vm-integracion`, región northcentralus) con Docker; el contenedor usa la
+  imagen `ghcr.io/ajrm18/nestjs-productos-grpc:latest` con `--restart always`.
+  Solo se abrió el puerto 5000 en el NSG (además del 22 por defecto).
+
+**¿Por qué una VM?** gRPC necesita HTTP/2 de punta a punta. La suscripción Azure
+for Students fuerza Azure Container Apps en modo Express, que no soporta HTTP/2,
+y ACR Tasks (builds en la nube) no está permitido en esta suscripción. Una VM con
+Docker expone el puerto gRPC directamente y además se puede reutilizar para los
+demás microservicios del semestre.
+
+**Actualizar la imagen en la VM** (después de que GitHub Actions publique una nueva):
+
+```bash
+az vm run-command invoke -g rg-vm-integracion -n vm-integracion \
+  --command-id RunShellScript --scripts "\
+docker pull ghcr.io/ajrm18/nestjs-productos-grpc:latest && \
+docker rm -f productos-grpc && \
+docker run -d --restart always -p 5000:5000 -e PORT=5000 --name productos-grpc ghcr.io/ajrm18/nestjs-productos-grpc:latest && \
+docker image prune -f && docker ps"
+```
