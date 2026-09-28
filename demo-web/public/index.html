@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Productos gRPC · Demo</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #1d2330; --muted: #5d6677; --border: #e1e5ec;
+    --accent: #2f6fdf; --accent-text: #fff; --ok: #1a7f4b; --err: #c0392b; --err-bg: #fdecea;
+    --code-bg: #eef1f6;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --card: #1b1f27; --text: #e6e9ef; --muted: #9aa3b2; --border: #2c323d;
+      --accent: #5b8ff0; --accent-text: #0d1117; --ok: #4cc38a; --err: #f07167; --err-bg: #3a1f1f;
+      --code-bg: #242a35;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 32px 16px 48px; }
+  header h1 { margin: 0 0 4px; font-size: 1.6rem; }
+  header p { margin: 0; color: var(--muted); }
+  .nota {
+    margin: 20px 0 24px; padding: 12px 14px; border: 1px solid var(--border);
+    border-left: 4px solid var(--accent); border-radius: 8px; background: var(--card);
+  }
+  .nota p { margin: 0 0 4px; }
+  .nota p:last-child { margin: 0; color: var(--muted); font-size: .92rem; }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: .9em; word-break: break-all; }
+  a { color: var(--accent); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .card h2 { margin: 0; font-size: 1.05rem; }
+  .tipo { font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .fila { display: flex; gap: 8px; flex-wrap: wrap; }
+  input {
+    flex: 1 1 90px; min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg); color: var(--text); font: inherit;
+  }
+  button {
+    padding: 8px 14px; border: 0; border-radius: 6px; background: var(--accent); color: var(--accent-text);
+    font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: .55; cursor: progress; }
+  button.sec { background: var(--err); }
+  .salida { min-height: 64px; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .salida li {
+    display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 6px; animation: entra .3s ease-out;
+  }
+  .salida li .precio { font-variant-numeric: tabular-nums; color: var(--ok); font-weight: 600; white-space: nowrap; }
+  .salida li.estado { border-style: dashed; color: var(--muted); justify-content: flex-start; font-size: .9rem; }
+  .salida li.error { background: var(--err-bg); border-color: var(--err); color: var(--err); display: block; }
+  @keyframes entra { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  footer { margin-top: 28px; color: var(--muted); font-size: .88rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Microservicio de productos (gRPC)</h1>
+    <p>NestJS + gRPC con server streaming, desplegado en una VM de Azure.</p>
+  </header>
+
+  <div class="nota">
+    <p><strong>Esta página es un cliente web; el servicio real es gRPC en el puerto 5000.</strong></p>
+    <p>Dirección gRPC: <code id="grpc-host">productos-grpc-ajrm18.northcentralus.cloudapp.azure.com:5000</code> (sin TLS, con server reflection) ·
+      Repositorio: <a href="https://github.com/ajrm18/nestjs-productos-grpc" target="_blank" rel="noopener">github.com/ajrm18/nestjs-productos-grpc</a></p>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <span class="tipo">Unary</span>
+      <h2>ObtenerProducto</h2>
+      <form class="fila" id="f-obtener">
+        <input type="number" id="id" value="1" min="1" step="1" aria-label="Id del producto" required>
+        <button type="submit">Obtener</button>
+      </form>
+      <ul class="salida" id="o-obtener"></ul>
+    </section>
+
+    <section class="card">
+      <span class="tipo">Unary · error</span>
+      <h2>Prueba de error (id 999)</h2>
+      <div class="fila"><button class="sec" id="b-error">Pedir producto 999</button></div>
+      <ul class="salida" id="o-error"></ul>
+    </section>
+
+    <section class="card">
+      <span class="tipo">Server streaming</span>
+      <h2>ListarProductos</h2>
+      <div class="fila"><button id="b-listar">Listar en streaming</button></div>
+      <ul class="salida" id="o-listar"></ul>
+    </section>
+
+    <section class="card">
+      <span class="tipo">Server streaming</span>
+      <h2>BuscarPorPrecioMaximo</h2>
+      <form class="fila" id="f-precio">
+        <input type="number" id="max" value="50" min="0" step="0.01" aria-label="Precio máximo" required>
+        <button type="submit">Buscar</button>
+      </form>
+      <ul class="salida" id="o-precio"></ul>
+    </section>
+  </div>
+
+  <footer>Cada producto de los streams llega por separado desde el servidor gRPC (uno cada 300 ms) y se reenvía al navegador con Server-Sent Events.</footer>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function item(salida, clase, html) {
+    const li = document.createElement('li');
+    if (clase) li.className = clase;
+    li.innerHTML = html;
+    salida.append(li);
+  }
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const producto = (salida, p, extra = '') =>
+    item(salida, '', `<span>#${p.id} · ${esc(p.nombre)}${extra}</span><span class="precio">$${Number(p.precio).toFixed(2)}</span>`);
+  const errorGrpc = (salida, e) =>
+    item(salida, 'error', `<strong>Error gRPC ${e.code} ${esc(e.codeName)}</strong><br>${esc(e.details)}`);
+
+  async function obtener(id, salida, boton) {
+    salida.replaceChildren();
+    boton.disabled = true;
+    try {
+      const r = await fetch(`/api/productos/${encodeURIComponent(id)}`);
+      const body = await r.json();
+      if (body.producto) producto(salida, body.producto);
+      else if (body.error && body.error.code !== undefined) errorGrpc(salida, body.error);
+      else item(salida, 'error', esc(body.error || 'Respuesta inesperada'));
+    } catch (e) {
+      item(salida, 'error', 'No se pudo contactar a la demo: ' + esc(e.message));
+    } finally {
+      boton.disabled = false;
+    }
+  }
+
+  function stream(url, salida, boton) {
+    salida.replaceChildren();
+    boton.disabled = true;
+    const inicio = performance.now();
+    let n = 0;
+    const es = new EventSource(url);
+    const terminar = () => { es.close(); boton.disabled = false; };
+    es.addEventListener('producto', (ev) => {
+      n++;
+      producto(salida, JSON.parse(ev.data), ` <small style="color:var(--muted)">(+${Math.round(performance.now() - inicio)} ms)</small>`);
+    });
+    es.addEventListener('fin', () => {
+      item(salida, 'estado', n ? `Stream finalizado · ${n} producto(s)` : 'Stream finalizado sin resultados');
+      terminar();
+    });
+    es.addEventListener('grpc-error', (ev) => { errorGrpc(salida, JSON.parse(ev.data)); terminar(); });
+    es.onerror = () => { if (es.readyState !== EventSource.CLOSED) { item(salida, 'error', 'Se perdió la conexión con la demo'); terminar(); } };
+  }
+
+  $('f-obtener').addEventListener('submit', (e) => {
+    e.preventDefault();
+    obtener($('id').value, $('o-obtener'), e.submitter || e.target.querySelector('button'));
+  });
+  $('b-error').addEventListener('click', (e) => obtener(999, $('o-error'), e.currentTarget));
+  $('b-listar').addEventListener('click', (e) => stream('/api/stream/productos', $('o-listar'), e.currentTarget));
+  $('f-precio').addEventListener('submit', (e) => {
+    e.preventDefault();
+    stream(`/api/stream/precio-maximo?max=${encodeURIComponent($('max').value)}`, $('o-precio'), e.submitter || e.target.querySelector('button'));
+  });
+</script>
+</body>
+</html>

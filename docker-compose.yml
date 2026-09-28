@@ -1,0 +1,25 @@
+services:
+  productos-grpc:
+    build: .
+    image: nestjs-productos-grpc:local
+    container_name: productos-grpc
+    environment:
+      PORT: "5000"
+    ports:
+      - "5000:5000"
+    restart: always
+
+  demo-web:
+    build:
+      context: .
+      dockerfile: demo-web/Dockerfile
+    image: productos-demo-web:local
+    container_name: demo-web
+    environment:
+      PORT: "80"
+      GRPC_TARGET: productos-grpc:5000
+    ports:
+      - "80:80"
+    depends_on:
+      - productos-grpc
+    restart: always

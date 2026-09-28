@@ -1,3 +1,4 @@
+import { ReflectionService } from '@grpc/reflection';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { join } from 'path';
@@ -10,6 +11,10 @@ async function bootstrap() {
       package: 'productos',
       protoPath: join(__dirname, 'productos.proto'),
       url: `0.0.0.0:${process.env.PORT ?? 5000}`,
+      // Server reflection: Postman/grpcurl descubren los servicios sin el .proto
+      onLoadPackageDefinition: (pkg, server) => {
+        new ReflectionService(pkg).addToServer(server);
+      },
     },
   });
   await app.listen();
