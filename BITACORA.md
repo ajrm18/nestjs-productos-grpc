@@ -161,12 +161,14 @@ para `NOT_FOUND`).
 
 ## 8. Despliegue en Azure
 
-- **Endpoint público:** `productos-grpc-ajrm18.northcentralus.cloudapp.azure.com:5000`
+- **Demo web:** <http://productos-grpc-ajrm18.northcentralus.cloudapp.azure.com>
+- **Endpoint gRPC:** `productos-grpc-ajrm18.northcentralus.cloudapp.azure.com:5000`
   (sin TLS). Prueba: `node cliente.js productos-grpc-ajrm18.northcentralus.cloudapp.azure.com:5000`
 - **Infraestructura:** VM Ubuntu 24.04 `vm-integracion` (Standard_B2ats_v2, grupo
-  `rg-vm-integracion`, región northcentralus) con Docker; el contenedor usa la
-  imagen `ghcr.io/ajrm18/nestjs-productos-grpc:latest` con `--restart always`.
-  Solo se abrió el puerto 5000 en el NSG (además del 22 por defecto).
+  `rg-vm-integracion`, región northcentralus) con Docker. El repo está clonado en
+  `/opt/nestjs-productos-grpc` y `docker compose` levanta dos contenedores con
+  `restart: always`: `productos-grpc` (puerto 5000) y `demo-web` (puerto 80). En el
+  NSG solo están abiertos el 5000, el 80 y el 22 que Azure deja por defecto.
 
 **¿Por qué una VM?** gRPC necesita HTTP/2 de punta a punta. La suscripción Azure
 for Students fuerza Azure Container Apps en modo Express, que no soporta HTTP/2,
@@ -174,13 +176,26 @@ y ACR Tasks (builds en la nube) no está permitido en esta suscripción. Una VM 
 Docker expone el puerto gRPC directamente y además se puede reutilizar para los
 demás microservicios del semestre.
 
-**Actualizar la imagen en la VM** (después de que GitHub Actions publique una nueva):
+**Actualizar la VM** después de hacer push a `main`:
 
 ```bash
 az vm run-command invoke -g rg-vm-integracion -n vm-integracion \
   --command-id RunShellScript --scripts "\
-docker pull ghcr.io/ajrm18/nestjs-productos-grpc:latest && \
-docker rm -f productos-grpc && \
-docker run -d --restart always -p 5000:5000 -e PORT=5000 --name productos-grpc ghcr.io/ajrm18/nestjs-productos-grpc:latest && \
-docker image prune -f && docker ps"
+cd /opt/nestjs-productos-grpc && git pull --ff-only && \
+docker compose up -d --build && docker image prune -f && docker compose ps"
 ```
+
+### 8.1 Server reflection y página de demostración
+
+- **Server reflection:** con `@grpc/reflection` y la opción `onLoadPackageDefinition`
+  de Nest (`new ReflectionService(pkg).addToServer(server)` en `src/main.ts`), el
+  servidor publica su propio contrato. Así Postman o `grpcurl` pueden listar
+  `productos.ProductoService` y llamar a sus métodos sin tener el `.proto`.
+- **Página de demostración (`demo-web/`):** es un servidor Express que actúa como
+  cliente gRPC (`@grpc/grpc-js` + `@grpc/proto-loader` con el mismo
+  `src/productos.proto`) y lee la dirección del servicio de `GRPC_TARGET`. Los
+  navegadores no pueden hablar gRPC nativo, así que la página llama a endpoints
+  HTTP. Los streams se reenvían con Server-Sent Events, un evento por producto,
+  y así se ve que llegan uno a uno. La prueba con id 999 muestra el código gRPC
+  `5 NOT_FOUND`. Dentro de la red de compose, la demo llega al servicio como
+  `productos-grpc:5000`.
